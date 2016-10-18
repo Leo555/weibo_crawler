@@ -9,7 +9,7 @@ var Request = require('request');
 var RsaEncrypt = require("./rsa").RSAKey;
 var async = require('async');
 var cheerio = require('cheerio');
-var cookieColl = Request.jar()
+var cookieColl = Request.jar();
 var request = Request.defaults({jar: cookieColl});
 
 var connection_string = '127.0.0.1:27017/weiboSina4';
@@ -131,7 +131,7 @@ function login(loginMsg, loginCallback) {
             loginCallback(null, cookieColl);
         }
     ], function (err) {
-        console.log(err)
+        console.log(err);
         loginCallback(err);
     });
 }
@@ -153,7 +153,7 @@ function getErrReason(errCode) {
         case "5":
             return "尚未注册微博";
         case "101":
-            return "用户名或密码错误。"
+            return "用户名或密码错误。";
         case "4098":
             return "您的帐号还没有设置密码，为方便登录请";
         case "9999":

@@ -64,7 +64,7 @@ function fetchUserWeibo(request, userId, callback) {
         var matchRst = body.match(feedsReg);
         if (matchRst) {
             var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
-            htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "")
+            htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
             var $ = cheerio.load(htmlRst);
 
             $("div[action-type=feed_list_item]").map(function (index, item) {
@@ -76,26 +76,33 @@ function fetchUserWeibo(request, userId, callback) {
             log("Completed:" + (fetchCnt++) + ", fetching:" + userId);
         }
         else {
-
             log("微博内容查找失败:" + userUrl);
             callback("微博内容查找失败");
-
         }
     });
 }
 
-weiboLoginModule.login(loginMsg, function (err, cookieColl) {
-    if (!err) {
-        var request = Request.defaults({jar: cookieColl});
-        var userColl = db.get("users");
-        var dailyPost = db.get("dailyWeibo");
 
-        userColl.find({}).each(function (doc) {
-            fetchUserWeibo(request, doc.uId, function (err, weibo) {
-                dailyPost.insert(weibo);
+function startJob() {
+    weiboLoginModule.login(loginMsg, function (err, cookieColl) {
+        if (!err) {
+            var request = Request.defaults({jar: cookieColl});
+            var userColl = db.get("users");
+            var dailyPost = db.get("dailyWeibo");
+
+            userColl.find({}, {limit: 200}).each(function (doc) {
+                fetchUserWeibo(request, doc.uId, function (err, weibo) {
+                    dailyPost.insert(weibo, (result)=> {
+                        result;
+                    });
+                });
+            }).catch((err) => {
+                console.log(err);
             });
-        }).catch((err) => {
-            console.log(err);
-        });
-    }
-});
+        }
+    });
+}
+
+module.exports = {
+    startJob: startJob
+};
