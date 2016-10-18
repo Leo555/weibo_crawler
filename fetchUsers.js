@@ -74,8 +74,7 @@ function getUserLst(htmlContent, userId) {
         var myFans = [];
         $("li[action-data]").map(function (index, item) {
             var userInfo = getUserInfo($, this);
-
-            if (userInfo) {
+            if (userInfo && userInfo.uId.length === 10) {
                 if (!cachedUsers[userInfo.uId]) {
                     userInfo.from = userId; //设置来源用户
                     cachedUsers[userInfo.uId] = true;
@@ -86,7 +85,6 @@ function getUserLst(htmlContent, userId) {
                     log(++userCnt);
                     saveUser(userInfo);
                     myFans.push(userInfo);
-
                 } else {
                     console.log("duplicate users");
                 }
@@ -106,7 +104,6 @@ function getUserInfo($, liSelector) {
     if (liActionData.length == 3) {
         sex = liActionData[2].split("=")[1];
     }
-
     return {
         name: liActionData[1].split("=")[1],
         uId: liActionData[0].split("=")[1],

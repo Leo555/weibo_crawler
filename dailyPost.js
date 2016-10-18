@@ -9,6 +9,7 @@ var Request = require('request'),
     moment = require('moment'),
     db = monk(connection_string),
     Promise = require('bluebird'),
+    _ = require('lodash'),
     cheerio = require('cheerio'),
     loginMsg = require('./config').loginMsg,
     feedsReg = /feed_list\'.*<\/script>/,
@@ -25,11 +26,9 @@ function getWeibo($, feedSelector) {
     var weiboInfo = {
         "tbinfo": weiboDiv.attr("tbinfo"),
         "mid": weiboDiv.attr("mid"),
-        "isforward": weiboDiv.attr("isforward"),
-        "minfo": weiboDiv.attr("minfo"),
-        "omid": weiboDiv.attr("omid"),
+        "isforward": weiboDiv.attr("isforward") || 0,
         "text": weiboDiv.find(".WB_detail>.WB_text").text().trim(),
-        "sendAt": new Date(parseInt(weiboDiv.find(".WB_detail>.WB_from a").eq(0).attr("date")))
+        "sendAt": weiboDiv.find(".WB_detail>.WB_from a").eq(0).attr("title")
     };
 
     if (weiboInfo.isforward) {
@@ -44,7 +43,7 @@ function getWeibo($, feedSelector) {
                 name: forwardUser.attr("nick-name"),
                 id: userCard ? userCard.split("=")[1] : "error",
                 text: forward.find(".WB_text").text().trim(),
-                "sendAt": new Date(parseInt(forward.find(".WB_from a").eq(0).attr("date")))
+                "sendAt": forward.find(".WB_from a").eq(0).attr("title")
             };
         }
     }
@@ -54,58 +53,77 @@ function getWeibo($, feedSelector) {
 
 function fetchUserWeibo(request, userId) {
     return new Promise((resolve, reject)=> {
-        var userUrl = "http://www.weibo.com/" + userId + "?is_all=1";
-
+        //var userUrl = 'http://www.weibo.com/' + userId + '?is_all=1';
+        var userUrl = 'http://www.weibo.com/' + userId + '?profile_ftype=1&is_all=1#_0';
         request.get({url: userUrl}, function (err, response, body) {
             if (err) {
                 log("微博内容查找失败:" + userUrl);
                 reject(err);
-                return;
-            }
-            var matchRst = body.match(feedsReg);
-            if (matchRst) {
-                var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
-                htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
-                var $ = cheerio.load(htmlRst);
-
-                $("div[action-type=feed_list_item]").map(function (index, item) {
-                    if ($(item).attr("feedtype") != "top") {
-                        resolve(getWeibo($, item));
-                    }
-                });
-
-                log("Completed:" + (fetchCnt++) + ", fetching:" + userId);
-            }
-            else {
-                log("微博内容查找失败:" + userUrl);
+            } else {
+                var matchRst = body.match(feedsReg);
+                if (matchRst) {
+                    var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
+                    htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
+                    var $ = cheerio.load(htmlRst);
+                    var weiboInfos = [];
+                    $("div[action-type=feed_list_item]").map(function (index, item) {
+                        if ($(item).attr("feedtype") != "top") {
+                            var weiboInfo = getWeibo($, item);
+                            weiboInfos.push(weiboInfo);
+                        }
+                    });
+                    resolve(weiboInfos);
+                    log("Completed:" + (fetchCnt++) + ", fetching:" + userId);
+                }
+                else {
+                    log("微博内容查找失败:" + userUrl);
+                    reject(new Error(userId));
+                }
             }
         });
     });
 }
 
+function insertWeibo(weibo, uId) {
+    var now = moment().format('YYYY-MM-DD HH:mm:ss');
+    var dailyPost = db.get("dailyWeibo");
+    var userColl = db.get("users");
+    weibo.fetchTime = now;
+    dailyPost.insert(weibo)
+        .then(()=> {
+            userColl.findOneAndUpdate({uId: uId}, {$set: {lastFetchTime: now, lastFetchResult: true}});
+        });
+}
 
 function startJob() {
     weiboLoginModule.login(loginMsg, function (err, cookieColl) {
         if (!err) {
             var request = Request.defaults({jar: cookieColl});
             var userColl = db.get("users");
-            var dailyPost = db.get("dailyWeibo");
+            var now = moment().format('YYYY-MM-DD HH:mm:ss');
             var today = moment().format('YYYY-MM-DD');
             userColl.find({lastFetchTime: {$lte: today + ' 00:00:00'}}, {
                 limit: 200,
                 sort: {lastFetchTime: 1}
-            }).each(function (doc) {
+            }).each((doc)=> {
                 if (doc.uId.length === 10) {
                     fetchUserWeibo(request, doc.uId)
-                        .then(function (err, weibo) {
-                            var now = moment().format('YYYY-MM-DD HH:mm:ss');
-                            dailyPost.insert(weibo, (result)=> {
-                                userColl.update({uId: doc.uId}, {$set: {'lastFetchTime': now}})
+                        .then((weibos)=> {
+                            var tasks = [];
+                            _.each(weibos, (w)=> {
+                                tasks.push(insertWeibo(w, doc.uId))
+                            });
+                            Promise.all(tasks);
+                        })
+                        .catch((e)=> {
+                            userColl.findOneAndUpdate({uId: doc.uId}, {
+                                $set: {
+                                    lastFetchTime: now,
+                                    lastFetchResult: false
+                                }
                             });
                         });
                 }
-            }).catch((err) => {
-                console.log(err);
             });
         }
     });
