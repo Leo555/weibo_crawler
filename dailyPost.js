@@ -14,7 +14,8 @@ var Request = require('request'),
     loginMsg = require('./config').loginMsg,
     feedsReg = /feed_list\'.*<\/script>/,
     rstEndFlag = '"})</script>',
-    fetchCnt = 0;
+    fetchCnt = 0,
+    cookieColl = Request.jar();
 
 function log(msg) {
     console.log(msg);
@@ -94,8 +95,9 @@ function insertWeibo(weibo, uId) {
             userColl.findOneAndUpdate({uId: uId}, {$set: {lastFetchTime: now, lastFetchResult: true}});
         });
 }
-
+//startJob()
 function startJob() {
+    console.log('start job');
     weiboLoginModule.login(loginMsg, function (err, cookieColl) {
         if (!err) {
             var request = Request.defaults({jar: cookieColl});
@@ -103,32 +105,75 @@ function startJob() {
             var now = moment().format('YYYY-MM-DD HH:mm:ss');
             var today = moment().format('YYYY-MM-DD');
             userColl.find({lastFetchTime: {$lte: today + ' 00:00:00'}}, {
-                limit: 200,
-                sort: {lastFetchTime: 1}
-            }).each((doc)=> {
-                if (doc.uId.length === 10) {
-                    fetchUserWeibo(request, doc.uId)
-                        .then((weibos)=> {
-                            var tasks = [];
-                            _.each(weibos, (w)=> {
-                                tasks.push(insertWeibo(w, doc.uId))
+                    limit: 200,
+                    sort: {lastFetchTime: 1}
+                })
+                .each((doc)=> {
+                    if (doc.uId.length === 10) {
+                        return fetchUserWeibo(request, doc.uId)
+                            .then((weibos)=> {
+                                var tasks = [];
+                                _.each(weibos, (w)=> {
+                                    tasks.push(insertWeibo(w, doc.uId))
+                                });
+                                Promise.all(tasks);
+                            })
+                            .catch((e)=> {
+                                userColl.findOneAndUpdate({uId: doc.uId}, {
+                                    $set: {
+                                        lastFetchTime: now,
+                                        lastFetchResult: false
+                                    }
+                                });
                             });
-                            Promise.all(tasks);
-                        })
-                        .catch((e)=> {
-                            userColl.findOneAndUpdate({uId: doc.uId}, {
-                                $set: {
-                                    lastFetchTime: now,
-                                    lastFetchResult: false
-                                }
-                            });
-                        });
-                }
-            });
+                    }
+                });
         }
     });
 }
 
+function startRecoverJob() {
+    console.log('start Recover Job');
+    weiboLoginModule.login(loginMsg, function (err, cookieColl) {
+        if (!err) {
+            var request = Request.defaults({jar: cookieColl});
+            var userColl = db.get("users");
+            var now = moment().format('YYYY-MM-DD HH:mm:ss');
+            var today = moment().format('YYYY-MM-DD');
+            userColl.find({lastFetchTime: {$gte: today + ' 00:00:00'}, lastFetchResult: false, tryCount: {$lt: 5}}, {
+                    limit: 200,
+                    sort: {lastFetchTime: 1}
+                })
+                .each((doc)=> {
+                    if (doc.uId.length === 10) {
+                        fetchUserWeibo(request, doc.uId)
+                            .then((weibos)=> {
+                                var tasks = [];
+                                _.each(weibos, (w)=> {
+                                    tasks.push(insertWeibo(w, doc.uId))
+                                });
+                                Promise.all(tasks);
+                            })
+                            .catch((e)=> {
+                                userColl.findOneAndUpdate({uId: doc.uId}, {
+                                    $set: {
+                                        lastFetchTime: now,
+                                        lastFetchResult: false
+                                    },
+                                    $inc: {
+                                        tryCount: 1
+                                    }
+
+                                });
+                            });
+                    }
+                });
+        }
+    });
+}
+
+
 module.exports = {
-    startJob: startJob
+    startJob: startJob,
+    startRecoverJob: startRecoverJob
 };

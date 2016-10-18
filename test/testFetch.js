@@ -7,7 +7,8 @@ var site = "http://weibo.com/3952070245";
 
 function fetch() {
     Request.get({
-        uri: site, headers: {
+        uri: site,
+        headers: {
             'User-Agent': 'google'
         }
     }, function (err, response, body) {

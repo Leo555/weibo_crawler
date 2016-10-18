@@ -113,9 +113,6 @@ function login(loginMsg, loginCallback) {
         },
         function (responseCode, body, callback) {
             console.log("登录完成");
-            var responseJson = getJsonObj(body);
-            console.log(responseJson);
-
             loginCallback(null, cookieColl);
         }
     ], function (err) {

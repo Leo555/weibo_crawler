@@ -82,6 +82,7 @@ function getUserLst(htmlContent, userId) {
                     userInfo.updateBy = os.hostname();
                     userInfo.lastFetchTime = moment().subtract(1, 'days').format(timeFormat);
                     userInfo.lastFetchResult = false;
+                    userInfo.tryCount = 0;
                     log(++userCnt);
                     saveUser(userInfo);
                     myFans.push(userInfo);
