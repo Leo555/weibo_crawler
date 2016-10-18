@@ -3,8 +3,8 @@
  */
 
 var loginMsg = {
-    userName: 'lizhen_go@163.com',
-    password: 'qq.2726762.'
+    userName: '*',
+    password: '*'
 }
 
 exports.loginMsg = loginMsg;
