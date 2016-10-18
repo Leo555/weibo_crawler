@@ -235,12 +235,13 @@ function start() {
                 .then((docs) => {
                     _.each(docs, function (doc) {
                         cachedUsers[doc.uId] = true;
-                        lastUid = doc.uId;
+                        if (doc.uId.length === 10)
+                            lastUid = doc.uId;
                     });
                 }).then(() => {
                 console.log("已有用户已经缓存完成, 开始进行递归查询");
                 console.log(lastUid);
-                getFansRecur(lastUid || 1708942053);
+                getFansRecur(lastUid || '2451227441');
             });
         }
     ], function (err) {

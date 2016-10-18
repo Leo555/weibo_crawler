@@ -2,17 +2,18 @@
  * Created by Leo on 2016/10/1.
  */
 'use strict';
-var Request = require('request');
-var weiboLoginModule = require("./weiboLogin");
-var connection_string = '127.0.0.1:27017/weiboSina';
-var monk = require('monk');
-var db = monk(connection_string);
-var cheerio = require('cheerio');
-var loginMsg = require('./config').loginMsg;
-
-var feedsReg = /feed_list\'.*<\/script>/;
-var rstEndFlag = '"})</script>';
-var fetchCnt = 0;
+var Request = require('request'),
+    weiboLoginModule = require("./weiboLogin"),
+    connection_string = '127.0.0.1:27017/weiboSina',
+    monk = require('monk'),
+    moment = require('moment'),
+    db = monk(connection_string),
+    Promise = require('bluebird'),
+    cheerio = require('cheerio'),
+    loginMsg = require('./config').loginMsg,
+    feedsReg = /feed_list\'.*<\/script>/,
+    rstEndFlag = '"})</script>',
+    fetchCnt = 0;
 
 function log(msg) {
     console.log(msg);
@@ -51,34 +52,34 @@ function getWeibo($, feedSelector) {
     return weiboInfo;
 }
 
-function fetchUserWeibo(request, userId, callback) {
+function fetchUserWeibo(request, userId) {
+    return new Promise((resolve, reject)=> {
+        var userUrl = "http://www.weibo.com/" + userId + "?is_all=1";
 
-    var userUrl = "http://www.weibo.com/" + userId + "?is_all=1";
+        request.get({url: userUrl}, function (err, response, body) {
+            if (err) {
+                log("微博内容查找失败:" + userUrl);
+                reject(err);
+                return;
+            }
+            var matchRst = body.match(feedsReg);
+            if (matchRst) {
+                var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
+                htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
+                var $ = cheerio.load(htmlRst);
 
-    request.get({url: userUrl}, function (err, response, body) {
-        if (err) {
-            log("微博内容查找失败:" + userUrl);
-            log(err);
-            return;
-        }
-        var matchRst = body.match(feedsReg);
-        if (matchRst) {
-            var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
-            htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
-            var $ = cheerio.load(htmlRst);
+                $("div[action-type=feed_list_item]").map(function (index, item) {
+                    if ($(item).attr("feedtype") != "top") {
+                        resolve(getWeibo($, item));
+                    }
+                });
 
-            $("div[action-type=feed_list_item]").map(function (index, item) {
-                if ($(item).attr("feedtype") != "top") {
-                    callback(null, getWeibo($, item));
-                }
-            });
-
-            log("Completed:" + (fetchCnt++) + ", fetching:" + userId);
-        }
-        else {
-            log("微博内容查找失败:" + userUrl);
-            callback("微博内容查找失败");
-        }
+                log("Completed:" + (fetchCnt++) + ", fetching:" + userId);
+            }
+            else {
+                log("微博内容查找失败:" + userUrl);
+            }
+        });
     });
 }
 
@@ -89,20 +90,27 @@ function startJob() {
             var request = Request.defaults({jar: cookieColl});
             var userColl = db.get("users");
             var dailyPost = db.get("dailyWeibo");
-
-            userColl.find({}, {limit: 200}).each(function (doc) {
-                fetchUserWeibo(request, doc.uId, function (err, weibo) {
-                    dailyPost.insert(weibo, (result)=> {
-                        result;
-                    });
-                });
+            var today = moment().format('YYYY-MM-DD');
+            userColl.find({lastFetchTime: {$lte: today + ' 00:00:00'}}, {
+                limit: 200,
+                sort: {lastFetchTime: 1}
+            }).each(function (doc) {
+                if (doc.uId.length === 10) {
+                    fetchUserWeibo(request, doc.uId)
+                        .then(function (err, weibo) {
+                            var now = moment().format('YYYY-MM-DD HH:mm:ss');
+                            dailyPost.insert(weibo, (result)=> {
+                                userColl.update({uId: doc.uId}, {$set: {'lastFetchTime': now}})
+                            });
+                        });
+                }
             }).catch((err) => {
                 console.log(err);
             });
         }
     });
 }
-
+startJob()
 module.exports = {
     startJob: startJob
 };

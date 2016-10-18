@@ -3,7 +3,6 @@
  */
 
 var iconv = require('iconv-lite'); //字符集转换
-var mongo = require('mongodb');
 var monk = require('monk');
 var Request = require('request');
 var RsaEncrypt = require("./rsa").RSAKey;
@@ -12,8 +11,6 @@ var cheerio = require('cheerio');
 var cookieColl = Request.jar();
 var request = Request.defaults({jar: cookieColl});
 
-var connection_string = '127.0.0.1:27017/weiboSina4';
-var db = monk(connection_string);
 
 function getJsonObj(body) {
     var start = body.indexOf("{");
@@ -44,7 +41,6 @@ function login(loginMsg, loginCallback) {
         function (responseCode, body, callback) {
             var responseJson = getJsonObj(body);
 
-            log(responseJson);
             log("Prelogin Success. ");
 
             var loginUrl = 'http://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.4.18)';
@@ -75,17 +71,11 @@ function login(loginMsg, loginCallback) {
             rsaKey.setPublic(responseJson.pubkey, '10001');
             var pwd = rsaKey.encrypt([responseJson.servertime, responseJson.nonce].join("\t") + "\n" + password);
 
-            log([responseJson.servertime, responseJson.nonce].join("\t") + "\n" + password);
-
             loginPostData.sp = pwd;
 
             loginPostData.servertime = responseJson.servertime;
             loginPostData.nonce = responseJson.nonce;
             loginPostData.rsakv = responseJson.rsakv;
-
-            log("pk:" + responseJson.pubkey);
-            log("su:" + loginPostData.su);
-            log("pwd:" + loginPostData.sp);
 
             request.post({
                 "uri": loginUrl,
@@ -96,8 +86,6 @@ function login(loginMsg, loginCallback) {
         },
         function (responseCode, body, callback) {
             body = iconv.decode(body, "GBK");
-
-            log(body)
 
             var errReason = /retcode=(\d+?)&/;
             var errorLoginMatch = body.match(errReason);
