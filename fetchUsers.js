@@ -81,7 +81,7 @@ function getUserLst(htmlContent, userId) {
                     cachedUsers[userInfo.uId] = true;
                     userInfo.createTime = moment().format(timeFormat);
                     userInfo.updateBy = os.hostname();
-                    userInfo.lastFetchTime = '';
+                    userInfo.lastFetchTime = moment().subtract(1, 'days').format(timeFormat);
                     userInfo.lastFetchResult = false;
                     log(++userCnt);
                     saveUser(userInfo);
