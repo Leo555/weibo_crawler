@@ -12,7 +12,9 @@ var os = require('os'),
     _ = require('lodash'),
     cheerio = require('cheerio'),
     cookieColl = Request.jar(),
-    request = Request.defaults({jar: cookieColl}),
+    request = Request.defaults({
+        jar: cookieColl
+    }),
     loginMsg = require('./config.js').loginMsg;
 
 var connection_string = '127.0.0.1:27017/weiboSina',
@@ -46,8 +48,7 @@ function getFansRecur(userId) {
         }, function (err, response, body) {
             if (err) {
                 console.log(err);
-            }
-            else {
+            } else {
                 var userLst = getUserLst(body, userId);
 
                 if (userLst) {
@@ -86,8 +87,7 @@ function getUserLst(htmlContent, userId) {
                     saveUser(userInfo);
                     myFans.push(userInfo);
 
-                }
-                else {
+                } else {
                     console.log("duplicate users");
                 }
             }
@@ -117,8 +117,7 @@ function getUserInfo($, liSelector) {
 function tryParseInt(str) {
     try {
         return parseInt(str);
-    }
-    catch (e) {
+    } catch (e) {
         console.log("parseInt failed.");
         return 0;
     }
@@ -183,7 +182,7 @@ function start() {
 
             request.post({
                 "uri": loginUrl,
-                "encoding": null,  //GBK编码 需要额外收到处理,
+                "encoding": null, //GBK编码 需要额外收到处理,
                 form: loginPostData
 
             }, callback);
@@ -196,8 +195,7 @@ function start() {
 
             if (errorLogin) {
                 callback("登录失败,原因:" + errorLogin[1]);
-            }
-            else {
+            } else {
                 var urlReg = /location\.replace\(\'(.*?)\'\)./;
                 var urlLoginAgain = body.match(urlReg);
 
@@ -207,8 +205,7 @@ function start() {
                         "uri": urlLoginAgain[1],
                         "encoding": "utf-8"
                     }, callback);
-                }
-                else {
+                } else {
                     callback("match failed");
                 }
             }
@@ -235,19 +232,19 @@ function start() {
             var nIndex = 0;
 
             userColl.find({})
-                .then((docs)=> {
+                .then((docs) => {
                     _.each(docs, function (doc) {
                         cachedUsers[doc.uId] = true;
                         lastUid = doc.uId;
                     });
-                }).then(()=> {
+                }).then(() => {
                 console.log("已有用户已经缓存完成, 开始进行递归查询");
                 console.log(lastUid);
-                getFansRecur("5823225786");
+                getFansRecur(lastUid || 1708942053);
             });
         }
     ], function (err) {
-        console.log(err)
+        console.log(err);
     });
 }
 
