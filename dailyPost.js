@@ -128,7 +128,7 @@ function startJob() {
         }
     });
 }
-startJob()
+
 module.exports = {
     startJob: startJob
 };
