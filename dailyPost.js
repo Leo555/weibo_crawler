@@ -27,7 +27,7 @@ function getWeibo($, feedSelector) {
     var weiboInfo = {
         "tbinfo": weiboDiv.attr("tbinfo"),
         "mid": weiboDiv.attr("mid"),
-        "isforward": weiboDiv.attr("isforward") || 0,
+        "isforward": weiboDiv.attr("isforward") === '1' ? 1 : 0,
         "text": weiboDiv.find(".WB_detail>.WB_text").text().trim(),
         "sendAt": weiboDiv.find(".WB_detail>.WB_from a").eq(0).attr("title")
     };
@@ -44,7 +44,7 @@ function getWeibo($, feedSelector) {
                 name: forwardUser.attr("nick-name"),
                 id: userCard ? userCard.split("=")[1] : "error",
                 text: forward.find(".WB_text").text().trim(),
-                "sendAt": forward.find(".WB_from a").eq(0).attr("title")
+                sendAt: forward.find(".WB_from a").eq(0).attr("title")
             };
         }
     }
