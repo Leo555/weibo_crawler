@@ -66,11 +66,17 @@ function fetchUserWeibo(request, userId) {
                     var htmlRst = '<div><div class="' + matchRst[0].substr(0, matchRst[0].length - rstEndFlag.length);
                     htmlRst = htmlRst.replace(/(\\n|\\t|\\r)/g, " ").replace(/\\/g, "");
                     var $ = cheerio.load(htmlRst);
+                    var yesterday = moment().format('YYYY-MM-DD');
+                    var dayBeforeYes = moment().subtract(1, 'days').format('YYYY-MM-DD');
                     var weiboInfos = [];
                     $("div[action-type=feed_list_item]").map(function (index, item) {
                         if ($(item).attr("feedtype") != "top") {
                             var weiboInfo = getWeibo($, item);
-                            weiboInfos.push(weiboInfo);
+                            //get yesterday weibo
+                            var sendTime = moment(weiboInfo.sendAt);
+                            if (sendTime.isBetween(dayBeforeYes, yesterday)) {
+                                weiboInfos.push(weiboInfo);
+                            }
                         }
                     });
                     resolve(weiboInfos);
@@ -95,6 +101,24 @@ function insertWeibo(weibo, uId) {
             userColl.findOneAndUpdate({uId: uId}, {$set: {lastFetchTime: now, lastFetchResult: true}});
         });
 }
+
+function updateUserStatus(id, result, inc) {
+    var userColl = db.get("users");
+    var now = moment().format('YYYY-MM-DD HH:mm:ss');
+    var update = {
+        $set: {
+            lastFetchTime: now,
+            lastFetchResult: result
+        }
+    };
+    if (inc) {
+        update['$inc'] = {
+            tryCount: 1
+        };
+    }
+    userColl.findOneAndUpdate({uId: id}, update);
+}
+
 startJob()
 function startJob() {
     console.log('start job');
@@ -116,23 +140,16 @@ function startJob() {
                                 _.each(weibos, (w)=> {
                                     tasks.push(insertWeibo(w, doc.uId))
                                 });
+                                if (_.isEmpty(weibos)) {
+                                    updateUserStatus(doc.uId, true);
+                                }
                                 Promise.all(tasks);
                             })
                             .catch((e)=> {
-                                userColl.findOneAndUpdate({uId: doc.uId}, {
-                                    $set: {
-                                        lastFetchTime: now,
-                                        lastFetchResult: false
-                                    }
-                                });
+                                updateUserStatus(doc.uId, false);
                             });
                     } else {
-                        userColl.findOneAndUpdate({uId: doc.uId}, {
-                            $set: {
-                                lastFetchTime: now,
-                                lastFetchResult: false
-                            }
-                        });
+                        updateUserStatus(doc.uId, true);
                     }
                 });
         }
@@ -159,30 +176,16 @@ function startRecoverJob() {
                                 _.each(weibos, (w)=> {
                                     tasks.push(insertWeibo(w, doc.uId))
                                 });
+                                if (_.isEmpty(weibos)) {
+                                    updateUserStatus(doc.uId, true);
+                                }
                                 Promise.all(tasks);
                             })
                             .catch((e)=> {
-                                userColl.findOneAndUpdate({uId: doc.uId}, {
-                                    $set: {
-                                        lastFetchTime: now,
-                                        lastFetchResult: false
-                                    },
-                                    $inc: {
-                                        tryCount: 1
-                                    }
-
-                                });
+                                updateUserStatus(doc.uId, false, true);
                             });
                     } else {
-                        userColl.findOneAndUpdate({uId: doc.uId}, {
-                            $set: {
-                                lastFetchTime: now,
-                                lastFetchResult: false
-                            },
-                            $inc: {
-                                tryCount: 1
-                            }
-                        });
+                        updateUserStatus(doc.uId, false, true);
                     }
                 });
         }
