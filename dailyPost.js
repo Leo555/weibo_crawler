@@ -126,6 +126,13 @@ function startJob() {
                                     }
                                 });
                             });
+                    } else {
+                        userColl.findOneAndUpdate({uId: doc.uId}, {
+                            $set: {
+                                lastFetchTime: now,
+                                lastFetchResult: false
+                            }
+                        });
                     }
                 });
         }
