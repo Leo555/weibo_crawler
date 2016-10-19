@@ -173,6 +173,13 @@ function startRecoverJob() {
 
                                 });
                             });
+                    } else {
+                        userColl.findOneAndUpdate({uId: doc.uId}, {
+                            $set: {
+                                lastFetchTime: now,
+                                lastFetchResult: false
+                            }
+                        });
                     }
                 });
         }
