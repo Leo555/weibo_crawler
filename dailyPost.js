@@ -161,7 +161,6 @@ function startRecoverJob() {
         if (!err) {
             var request = Request.defaults({jar: cookieColl});
             var userColl = db.get("users");
-            var now = moment().format('YYYY-MM-DD HH:mm:ss');
             var today = moment().format('YYYY-MM-DD');
             userColl.find({lastFetchTime: {$gte: today + ' 00:00:00'}, lastFetchResult: false, tryCount: {$lt: 5}}, {
                     limit: 200,
