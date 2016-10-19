@@ -95,7 +95,7 @@ function insertWeibo(weibo, uId) {
             userColl.findOneAndUpdate({uId: uId}, {$set: {lastFetchTime: now, lastFetchResult: true}});
         });
 }
-//startJob()
+startJob()
 function startJob() {
     console.log('start job');
     weiboLoginModule.login(loginMsg, function (err, cookieColl) {
@@ -178,6 +178,9 @@ function startRecoverJob() {
                             $set: {
                                 lastFetchTime: now,
                                 lastFetchResult: false
+                            },
+                            $inc: {
+                                tryCount: 1
                             }
                         });
                     }
