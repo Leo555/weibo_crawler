@@ -119,7 +119,6 @@ function updateUserStatus(id, result, inc) {
     userColl.findOneAndUpdate({uId: id}, update);
 }
 
-startJob()
 function startJob() {
     console.log('start job');
     weiboLoginModule.login(loginMsg, function (err, cookieColl) {
