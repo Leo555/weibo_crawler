@@ -29,7 +29,7 @@ function startLTPJob() {
             var tasks = [];
             _.each(docs, (doc)=> {
                 if (doc.text) {
-                    tasks.push(sendReq(doc._id, doc.text.replace(/[&\|\\\*！.!`~,，…【】:：、；（）?？();/-<>“”""《》。^%$#@\-]/g, " ")));
+                    tasks.push(sendReq(doc._id, replaceAll(doc.text)));
                 }
             });
         });
@@ -49,5 +49,11 @@ function sendReq(id, text) {
 }
 
 function replaceAll(text) {
-    
+    var result = text.replace(/[&\|\\\*！.!`~,，…【】:：、；（）?？();/-<>“”""《》。^%$#@\-]/g, " ").trim();
+    var  index = result.indexOf("  ");
+    while (index > -1) {
+        result = result.replace("  ", " ");
+        index = result.indexOf("  ");
+    }
+    return result;
 }
